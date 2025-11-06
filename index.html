@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8" />
+<title>Entrenador de contrasenyes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(120deg,#fff6cc,#ffd480);
+    margin: 36px;
+    text-align: left;
+  }
+
+  h1 { text-align: center; }
+
+  table {
+    margin: 0 auto;
+    background: #fff3b0;
+    border-collapse: collapse;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.15);
+  }
+
+  td { padding: 10px 14px; vertical-align: middle; }
+
+  input[type="text"],
+  input[type="password"] {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px;
+    font-size: 14px;
+  }
+
+  input[type="button"],
+  button {
+    background: #ff9900;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+
+  input[readonly] {
+    background: transparent;
+    border: none;
+    text-align: left;
+  }
+
+  #marcador {
+    font-size: 1.6em;
+    color: #ff6600;
+    margin-top: 18px;
+    text-align: center;
+    letter-spacing: 3px;
+  }
+
+  .bar-container {
+    width: 120px;
+    height: 10px;
+    background: #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
+  .bar {
+    height: 100%;
+    width: 0;
+    background: green;
+    transition: width .3s, background-color .3s;
+  }
+
+  .confetti {
+    position: fixed;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    opacity: 0.9;
+    z-index: 9999;
+    border-radius: 2px;
+    pointer-events: none;
+    animation: confettiFall linear forwards;
+  }
+
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  .alineat-esquerra { text-align: left; }
+</style>
+</head>
+
+<body onload="iniciar()">
+  <h1>🔐 Entrenador de contrasenyes</h1>
+
+  <form name="joc" onsubmit="return false;">
+    <table>
+      <tr>
+        <td><b>Contrasenya:</b></td>
+        <td>
+          <input id="clave" name="clave" size="18" type="password" tabindex="1"
+            onkeyup="muestra_seguridad_clave(this.value,this.form)">
+        </td>
+        <td class="alineat-esquerra">
+          <b>Seguretat:</b>
+          <input name="seguridad" size="6" readonly>
+          <div class="bar-container"><div id="barra" class="bar"></div></div>
+        </td>
+      </tr>
+
+      <tr>
+        <td><b>Repeteix la contrasenya:</b></td>
+        <td><input name="conf" size="18" type="password" tabindex="2"></td>
+        <td class="alineat-esquerra">
+          <b>Encerts:</b> <input name="score" size="4" readonly value="0">
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <label><input id="mostrar" type="checkbox" onclick="mostrarPassword()"> Mostra la contrasenya</label>
+        </td>
+        <td>
+          <input id="btnComprova" type="button" value="Comprova" tabindex="3" onclick="iguales()">
+        </td>
+        <td class="alineat-esquerra">
+          <b>Temps:</b> <input type="text" name="cronometro" value="00:00" size="6" readonly>
+        </td>
+      </tr>
+    </table>
+
+    <div id="marcador"></div>
+    <br>
+    <div style="text-align:center;">
+      <button type="button" onclick="reiniciar()">🔄 Reinicia joc</button>
+    </div>
+  </form>
+
+<script>
+let punts = 0;
+let minuto = 0, segundo = 0, temps;
+let bajamin = "00", bajasec = "00";
+
+function tiene_numeros(t){ return /[0-9]/.test(t); }
+function tiene_letras(t){ return /[a-zA-Z]/.test(t); }
+function tiene_minusculas(t){ return /[a-z]/.test(t); }
+function tiene_mayusculas(t){ return /[A-Z]/.test(t); }
+
+function seguridad_clave(clave){
+  let seg = 0;
+  if (clave.length) {
+    if (tiene_numeros(clave) && tiene_letras(clave)) seg += 30;
+    if (tiene_minusculas(clave) && tiene_mayusculas(clave)) seg += 30;
+    if (clave.length >=4 && clave.length <=5) seg += 10;
+    else if (clave.length >=6 && clave.length <=7) seg += 20;
+    else if (clave.length >7) seg += 40;
+  }
+  return Math.min(seg,100);
+}
+
+function muestra_seguridad_clave(clave, form){
+  const s = seguridad_clave(clave);
+  form.seguridad.value = s + "%";
+  updateBar(s);
+}
+
+function updateBar(val){
+  const bar = document.getElementById("barra");
+  bar.style.width = val + "%";
+  if (val < 40) bar.style.backgroundColor = "red";
+  else if (val < 80) bar.style.backgroundColor = "orange";
+  else bar.style.backgroundColor = "green";
+}
+
+function mostrarPassword(){
+  const chk = document.getElementById("mostrar");
+  const input = document.getElementById("clave");
+  input.type = chk.checked ? "text" : "password";
+}
+
+function segura(){
+  const seg = seguridad_clave(document.joc.clave.value);
+  if (seg < 99) {
+    playError();
+    alert("⚠️ CONTRASENYA NO SEGURA!");
+    document.joc.seguridad.value = "";
+    updateBar(0);
+    document.joc.clave.focus();
+    return false;
+  }
+  return true;
+}
+
+function iguales(){
+  if (!segura()) return;
+  const c1 = document.joc.clave.value;
+  const c2 = document.joc.conf.value;
+  if (c1 !== c2){
+    playError();
+    alert("❌ LES CONTRASENYES NO COINCIDEIXEN!\nTorna a provar-ho!");
+    punts = Math.max(0, punts - 1);
+  } else {
+    playSuccess();
+    punts++;
+    if (punts >= 15) {
+      parartemps();
+      playVictory();
+      confettiLocal();
+      alert("🏆 HAS GUANYAT! HAS OBTINGUT " + punts + " PUNTS EN " + bajamin + " MINUTS I " + bajasec + " SEGONS.");
+    }
+  }
+  document.joc.score.value = punts;
+  actualitzaMarcador();
+  document.joc.conf.value = "";
+  document.joc.conf.focus();
+}
+
+function iniciar(){
+  document.getElementById("mostrar").checked = false;
+  mostrarPassword();
+  document.joc.clave.focus();
+  actualitzaMarcador();
+  temps = setTimeout(crono,1000);
+  document.addEventListener("keydown", (ev)=>{
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      iguales();
+    }
+  });
+}
+
+function crono(){
+  bajamin = String(minuto).padStart(2,"0");
+  bajasec = String(segundo).padStart(2,"0");
+  document.joc.cronometro.value = bajamin + ":" + bajasec;
+  segundo++;
+  if (segundo >= 60){ segundo = 0; minuto++; }
+  temps = setTimeout(crono,1000);
+}
+
+function parartemps(){ clearTimeout(temps); }
+
+function actualitzaMarcador(){
+  const total = 15;
+  const marcador = document.getElementById("marcador");
+  marcador.innerHTML = "⭐".repeat(punts) + "☆".repeat(total - punts);
+}
+
+function reiniciar(){
+  punts = 0; minuto = 0; segundo = 0;
+  clearTimeout(temps);
+  iniciar();
+  document.joc.score.value = 0;
+  document.joc.cronometro.value = "00:00";
+  document.joc.seguridad.value = "";
+  updateBar(0);
+  document.joc.clave.value = "";
+  document.joc.conf.value = "";
+}
+
+/* SONS AMB WEB AUDIO */
+const AudioEngine = (function(){
+  let ctx = null;
+  function ensureContext(){
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
+  }
+  function tone(freq, dur=150, type='sine', when=0, gain=0.15){
+    const c = ensureContext();
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + when);
+    g.gain.setValueAtTime(gain, c.currentTime + when);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime + when);
+    o.stop(c.currentTime + when + dur/1000);
+  }
+  function successMelody(){
+    tone(600,120); setTimeout(()=>tone(850,130),130);
+  }
+  function errorSound(){
+    tone(180,200,'square',0,0.18);
+  }
+  function victoryTune(){
+    // Fanfàrria amb notes consecutives
+    const notes = [600, 750, 900, 1100, 1300];
+    let delay = 0;
+    notes.forEach((n)=>{
+      tone(n,180,'triangle',delay,0.2);
+      delay += 0.22; // separació entre notes
+    });
+  }
+  return {
+    playSuccess: successMelody,
+    playError: errorSound,
+    playVictory: victoryTune,
+    _ensure: ensureContext
+  };
+})();
+function playSuccess(){ AudioEngine.playSuccess(); }
+function playError(){ AudioEngine.playError(); }
+function playVictory(){ AudioEngine.playVictory(); }
+
+/* CONFETI LOCAL FUNCIONAL */
+function confettiLocal(){
+  const colors = ["#ff595e","#ffca3a","#8ac926","#1982c4","#6a4c93"];
+  for (let i = 0; i < 100; i++){
+    const conf = document.createElement('div');
+    conf.classList.add('confetti');
+    const size = 6 + Math.random()*8;
+    conf.style.width = conf.style.height = size + 'px';
+    conf.style.left = Math.random() * 100 + 'vw';
+    conf.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+    const dur = 3 + Math.random()*2;
+    conf.style.animationDuration = dur + 's';
+    conf.style.transform = `rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(conf);
+    setTimeout(()=> conf.remove(), dur*1000);
+  }
+}
+
+/* Activació del context d'àudio al primer clic */
+document.addEventListener('click', function initAudioOnce(){
+  try { AudioEngine._ensure(); } catch(e){}
+  document.removeEventListener('click', initAudioOnce);
+});
+</script>
+</body>
+</html>
